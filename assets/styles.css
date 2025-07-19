@@ -1,0 +1,30 @@
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background-color: #fffaf7;
+    color: #333;
+}
+
+.navbar-brand {
+    font-weight: bold;
+    color: #d3816d !important;
+}
+
+.navbar {
+    background-color: #fbe9e7;
+}
+
+footer {
+    background-color: #f8f8f8;
+    padding: 20px 0;
+}
+
+.trust-badges img {
+    height: 40px;
+    margin-right: 10px;
+}
+
+.product-card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
