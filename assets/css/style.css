@@ -1,0 +1,35 @@
+:root {
+  --primary-color: #FFB6B6; /* light pink */
+  --secondary-color: #F9D5D3; /* peach */
+  --accent-color: #F5EEE6; /* beige */
+  --text-color: #333333;
+}
+body {
+  font-family: Arial, sans-serif;
+  background-color: var(--accent-color);
+  color: var(--text-color);
+}
+.navbar {
+  background-color: var(--primary-color);
+}
+.footer {
+  background-color: var(--primary-color);
+  color: #ffffff;
+  padding: 20px 0;
+}
+.trust-badges img {
+  height: 40px;
+  margin-right: 10px;
+}
+.product-card {
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  padding: 10px;
+  margin-bottom: 20px;
+  background-color: #ffffff;
+}
+@media (max-width: 576px) {
+  .product-card {
+    text-align: center;
+  }
+}
