@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from .memory import SessionMemory
 from .models import ModelSelection, select_models
@@ -55,6 +56,7 @@ class OfflineCodingAgent:
         workspace: Path,
         max_iters: int = 5,
         memory_file: Path | None = None,
+        progress_callback: Callable[[str], None] | None = None,
     ) -> dict:
         workspace = workspace.resolve()
         workspace.mkdir(parents=True, exist_ok=True)
@@ -66,11 +68,17 @@ class OfflineCodingAgent:
         memory.compact()
 
         models = select_models(task)
-        codebase_snapshot = self._describe_codebase(tooling.list_files("."))
+        all_files = tooling.list_files(".")
+        relevant_files = self._select_relevant_files(task, all_files)
+        codebase_snapshot = self._describe_codebase(relevant_files)
+        self._emit_progress(progress_callback, "Analyzed codebase and selected relevant files.")
         planner_output = self._plan(task, models, memory)
+        self._emit_progress(progress_callback, "Generated plan.")
         plan_reflection = self._reflect(models, f"Reflect on this plan and improve it:\n\n{planner_output}")
+        self._emit_progress(progress_callback, "Reflected on plan quality.")
         coded = self._code(task, planner_output, models, memory, codebase_snapshot)
         parsed = self._materialize(coded, tooling)
+        self._emit_progress(progress_callback, "Materialized generated files.")
 
         iteration_logs: list[IterationLog] = []
         current_output = parsed
@@ -96,6 +104,7 @@ class OfflineCodingAgent:
                     break
 
             if failed is None:
+                self._emit_progress(progress_callback, f"Iteration {idx} executed successfully.")
                 break
 
             debug_response = self._debug(task, planner_output, models, memory, failed)
@@ -106,8 +115,10 @@ class OfflineCodingAgent:
             )
             memory.conversation_history.append(fix_reflection)
             current_output = self._materialize(debug_response, tooling)
+            self._emit_progress(progress_callback, f"Iteration {idx} failed; applied automated debug fix.")
 
         review_notes = self._review(task, planner_output, models, memory, tooling.list_files("."))
+        self._emit_progress(progress_callback, "Completed review step.")
 
         memory.project_files = tooling.list_files(".")
         memory.save(memory_path)
@@ -120,6 +131,7 @@ class OfflineCodingAgent:
             "codebase_analysis": parsed.codebase_analysis,
             "review_notes": review_notes,
             "written_files": [generated.path for generated in parsed.files],
+            "relevant_files": relevant_files,
             "iterations": iteration_logs,
             "model_iteration_log": parsed.iteration_log,
             "memory_file": str(memory_path),
@@ -218,3 +230,24 @@ class OfflineCodingAgent:
         sample = files[:max_files]
         suffix = "" if len(files) <= max_files else f"\n...and {len(files) - max_files} more files."
         return "\n".join(sample) + suffix
+
+    @staticmethod
+    def _select_relevant_files(task: str, files: list[str], max_files: int = 25) -> list[str]:
+        if not files:
+            return []
+        keywords = {token for token in task.lower().split() if len(token) > 3}
+        scored: list[tuple[int, str]] = []
+        for path in files:
+            lower_path = path.lower()
+            score = sum(1 for keyword in keywords if keyword in lower_path)
+            scored.append((score, path))
+        scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        selected = [path for score, path in scored if score > 0][:max_files]
+        if selected:
+            return selected
+        return files[:max_files]
+
+    @staticmethod
+    def _emit_progress(progress_callback: Callable[[str], None] | None, message: str) -> None:
+        if progress_callback is not None:
+            progress_callback(message)

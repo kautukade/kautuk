@@ -24,3 +24,8 @@ class AgentUtilityTests(unittest.TestCase):
         memory.compact(max_items=10)
         self.assertEqual(len(memory.conversation_history), 10)
         self.assertIn("item-0", memory.conversation_summary)
+
+    def test_select_relevant_files(self) -> None:
+        files = ["src/api/server.py", "src/ui/view.py", "README.md"]
+        selected = OfflineCodingAgent._select_relevant_files("update api server routes", files)
+        self.assertIn("src/api/server.py", selected)

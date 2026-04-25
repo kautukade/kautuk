@@ -12,6 +12,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("task", help="Natural language coding request.")
     parser.add_argument("--workspace", default="generated_project", help="Directory to generate code into.")
     parser.add_argument("--memory-file", default=None, help="Optional path for persistent memory JSON.")
+    parser.add_argument("--stream", action="store_true", help="Print incremental progress updates.")
     parser.add_argument(
         "--max-iters",
         type=int,
@@ -30,6 +31,7 @@ def main() -> None:
         workspace=Path(args.workspace),
         max_iters=max(1, min(args.max_iters, 5)),
         memory_file=Path(args.memory_file) if args.memory_file else None,
+        progress_callback=(lambda msg: print(f"[progress] {msg}")) if args.stream else None,
     )
 
     serializable = {
@@ -40,6 +42,7 @@ def main() -> None:
         "codebase_analysis": result["codebase_analysis"],
         "review_notes": result["review_notes"],
         "written_files": result["written_files"],
+        "relevant_files": result["relevant_files"],
         "iterations": [entry.__dict__ for entry in result["iterations"]],
         "model_iteration_log": result["model_iteration_log"],
         "memory_file": result["memory_file"],
