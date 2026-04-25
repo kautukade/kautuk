@@ -63,3 +63,11 @@ class AgentUtilityTests(unittest.TestCase):
                     tooling,
                     apply_changes_callback=lambda _changes: False,
                 )
+
+    def test_materialize_propose_only_does_not_write_files(self) -> None:
+        raw = """<spec>\ns\n</spec>\n<plan>\np\n</plan>\n<reflection>\nr\n</reflection>\n<codebase_analysis>\nc\n</codebase_analysis>\n<files>\n<file path=\"a.py\">\n1\n</file>\n</files>\n<commands>\npython a.py\n</commands>\n<iteration_log>\nlog\n</iteration_log>"""
+        with TemporaryDirectory() as tmp:
+            tooling = LocalTooling(Path(tmp))
+            _parsed, changes = OfflineCodingAgent._materialize(raw, tooling, apply_writes=False)
+            self.assertFalse((Path(tmp) / "a.py").exists())
+            self.assertFalse(changes[0].applied)

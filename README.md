@@ -19,6 +19,7 @@ A local-first autonomous coding assistant for Ollama that simulates a multi-agen
 - Interactive safety prompt for major file batches (`--interactive`)
 - Per-file change previews in CLI JSON (`file_changes`) to improve edit visibility
 - In interactive mode, CLI shows diff previews and requests approval before writing files
+- Proposal mode (`--propose-only`) validates and previews diffs without modifying files
 
 ## Install
 

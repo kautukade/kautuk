@@ -14,6 +14,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--memory-file", default=None, help="Optional path for persistent memory JSON.")
     parser.add_argument("--stream", action="store_true", help="Print incremental progress updates.")
     parser.add_argument("--interactive", action="store_true", help="Prompt before applying major file batches.")
+    parser.add_argument("--propose-only", action="store_true", help="Preview and validate changes without writing files.")
     parser.add_argument(
         "--major-change-threshold",
         type=int,
@@ -42,6 +43,7 @@ def main() -> None:
         approve_major_changes=(not args.interactive) or _confirm_major_changes(),
         major_change_threshold=max(1, args.major_change_threshold),
         apply_changes_callback=_interactive_change_review if args.interactive else None,
+        propose_only=args.propose_only,
     )
 
     serializable = {
@@ -55,6 +57,7 @@ def main() -> None:
         "review_notes": result["review_notes"],
         "written_files": result["written_files"],
         "file_changes": result["file_changes"],
+        "propose_only": result["propose_only"],
         "relevant_files": result["relevant_files"],
         "iterations": [entry.__dict__ for entry in result["iterations"]],
         "model_iteration_log": result["model_iteration_log"],
