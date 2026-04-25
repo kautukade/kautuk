@@ -16,6 +16,8 @@ A local-first autonomous coding assistant for Ollama that simulates a multi-agen
 - Execution loop with automatic debugging up to 5 iterations and command timeout protection
 - Retrieval-aware file selection so prompts include only relevant codebase context
 - Optional streaming progress updates (`--stream`) for incremental visibility
+- Interactive safety prompt for major file batches (`--interactive`)
+- Per-file change previews in CLI JSON (`file_changes`) to improve edit visibility
 
 ## Install
 
@@ -38,7 +40,7 @@ ollama pull gemma:2b
 ## Usage
 
 ```bash
-kautuk-agent "Build a FastAPI todo app with tests" --workspace ./output_project --max-iters 5 --stream
+kautuk-agent "Build a FastAPI todo app with tests" --workspace ./output_project --max-iters 5 --stream --interactive
 ```
 
 Optional memory file:

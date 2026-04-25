@@ -13,6 +13,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--workspace", default="generated_project", help="Directory to generate code into.")
     parser.add_argument("--memory-file", default=None, help="Optional path for persistent memory JSON.")
     parser.add_argument("--stream", action="store_true", help="Print incremental progress updates.")
+    parser.add_argument("--interactive", action="store_true", help="Prompt before applying major file batches.")
+    parser.add_argument(
+        "--major-change-threshold",
+        type=int,
+        default=10,
+        help="Number of changed files considered a major change.",
+    )
     parser.add_argument(
         "--max-iters",
         type=int,
@@ -32,6 +39,8 @@ def main() -> None:
         max_iters=max(1, min(args.max_iters, 5)),
         memory_file=Path(args.memory_file) if args.memory_file else None,
         progress_callback=(lambda msg: print(f"[progress] {msg}")) if args.stream else None,
+        approve_major_changes=(not args.interactive) or _confirm_major_changes(),
+        major_change_threshold=max(1, args.major_change_threshold),
     )
 
     serializable = {
@@ -44,12 +53,18 @@ def main() -> None:
         "codebase_analysis": result["codebase_analysis"],
         "review_notes": result["review_notes"],
         "written_files": result["written_files"],
+        "file_changes": result["file_changes"],
         "relevant_files": result["relevant_files"],
         "iterations": [entry.__dict__ for entry in result["iterations"]],
         "model_iteration_log": result["model_iteration_log"],
         "memory_file": result["memory_file"],
     }
     print(json.dumps(serializable, indent=2))
+
+
+def _confirm_major_changes() -> bool:
+    answer = input("Major changes may be required. Continue? [y/N]: ").strip().lower()
+    return answer in {"y", "yes"}
 
 
 if __name__ == "__main__":

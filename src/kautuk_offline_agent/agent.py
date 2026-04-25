@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from difflib import unified_diff
 from pathlib import Path
 from typing import Callable
 
@@ -49,6 +50,13 @@ class IterationLog:
     output: str
 
 
+@dataclass
+class FileChange:
+    path: str
+    status: str
+    diff_preview: str
+
+
 class OfflineCodingAgent:
     def __init__(self, client: OllamaClient | None = None) -> None:
         self.client = client or OllamaClient()
@@ -60,6 +68,8 @@ class OfflineCodingAgent:
         max_iters: int = 5,
         memory_file: Path | None = None,
         progress_callback: Callable[[str], None] | None = None,
+        approve_major_changes: bool = False,
+        major_change_threshold: int = 10,
     ) -> dict:
         workspace = workspace.resolve()
         workspace.mkdir(parents=True, exist_ok=True)
@@ -82,7 +92,12 @@ class OfflineCodingAgent:
         plan_reflection = self._reflect(models, f"Reflect on this plan and improve it:\n\n{planner_output}")
         self._emit_progress(progress_callback, "Reflected on plan quality.")
         coded = self._code(task, technical_spec, planner_output, models, memory, codebase_snapshot)
-        parsed = self._materialize(coded, tooling)
+        parsed, file_changes = self._materialize(
+            coded,
+            tooling,
+            approve_major_changes=approve_major_changes,
+            major_change_threshold=major_change_threshold,
+        )
         self._emit_progress(progress_callback, "Materialized generated files.")
 
         iteration_logs: list[IterationLog] = []
@@ -119,7 +134,8 @@ class OfflineCodingAgent:
                 f"Command: {failed.command}\nOutput:\n{failed.merged_output}",
             )
             memory.conversation_history.append(fix_reflection)
-            current_output = self._materialize(debug_response, tooling)
+            current_output, debug_changes = self._materialize(debug_response, tooling)
+            file_changes.extend(debug_changes)
             self._emit_progress(progress_callback, f"Iteration {idx} failed; applied automated debug fix.")
 
         review_notes = self._review(task, planner_output, models, memory, tooling.list_files("."))
@@ -138,6 +154,7 @@ class OfflineCodingAgent:
             "codebase_analysis": parsed.codebase_analysis,
             "review_notes": review_notes,
             "written_files": [generated.path for generated in parsed.files],
+            "file_changes": [change.__dict__ for change in file_changes],
             "relevant_files": relevant_files,
             "iterations": iteration_logs,
             "model_iteration_log": parsed.iteration_log,
@@ -218,13 +235,42 @@ class OfflineCodingAgent:
         return self.client.generate(models.planner, prompt, system=REVIEWER_SYSTEM)
 
     @staticmethod
-    def _materialize(raw: str, tooling: LocalTooling) -> StructuredOutput:
+    def _materialize(
+        raw: str,
+        tooling: LocalTooling,
+        approve_major_changes: bool = True,
+        major_change_threshold: int = 10,
+    ) -> tuple[StructuredOutput, list[FileChange]]:
         parsed = parse_structured_output(raw)
         if not parsed.files:
             raise ValueError("Model response did not include any <file> blocks.")
+        if len(parsed.files) > major_change_threshold and not approve_major_changes:
+            raise ValueError(
+                f"Major change detected ({len(parsed.files)} files). "
+                "Set approve_major_changes=True to continue."
+            )
+        changes: list[FileChange] = []
         for generated in parsed.files:
+            try:
+                existing = tooling.read_file(generated.path)
+                status = "modified"
+            except FileNotFoundError:
+                existing = ""
+                status = "created"
             tooling.write_file(generated.path, generated.content)
-        return parsed
+            diff_lines = list(
+                unified_diff(
+                    existing.splitlines(),
+                    generated.content.splitlines(),
+                    fromfile=f"a/{generated.path}",
+                    tofile=f"b/{generated.path}",
+                    lineterm="",
+                    n=2,
+                )
+            )
+            preview = "\n".join(diff_lines[:40])
+            changes.append(FileChange(path=generated.path, status=status, diff_preview=preview))
+        return parsed, changes
 
     def _reflect(self, models: ModelSelection, content: str) -> str:
         return self.client.generate(models.planner, content, system=REFLECTION_SYSTEM)

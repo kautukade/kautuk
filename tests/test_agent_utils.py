@@ -1,7 +1,10 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from kautuk_offline_agent.agent import OfflineCodingAgent
 from kautuk_offline_agent.memory import SessionMemory
+from kautuk_offline_agent.tools import LocalTooling
 
 
 class AgentUtilityTests(unittest.TestCase):
@@ -29,3 +32,23 @@ class AgentUtilityTests(unittest.TestCase):
         files = ["src/api/server.py", "src/ui/view.py", "README.md"]
         selected = OfflineCodingAgent._select_relevant_files("update api server routes", files)
         self.assertIn("src/api/server.py", selected)
+
+    def test_materialize_produces_change_preview(self) -> None:
+        raw = """<spec>\ns\n</spec>\n<plan>\np\n</plan>\n<reflection>\nr\n</reflection>\n<codebase_analysis>\nc\n</codebase_analysis>\n<files>\n<file path=\"a.py\">\nprint('x')\n</file>\n</files>\n<commands>\npython a.py\n</commands>\n<iteration_log>\nlog\n</iteration_log>"""
+        with TemporaryDirectory() as tmp:
+            tooling = LocalTooling(Path(tmp))
+            _, changes = OfflineCodingAgent._materialize(raw, tooling, approve_major_changes=True)
+            self.assertEqual(changes[0].status, "created")
+            self.assertIn("a/a.py", changes[0].diff_preview)
+
+    def test_materialize_blocks_major_changes_without_approval(self) -> None:
+        raw = """<spec>\ns\n</spec>\n<plan>\np\n</plan>\n<reflection>\nr\n</reflection>\n<codebase_analysis>\nc\n</codebase_analysis>\n<files>\n<file path=\"a.py\">\n1\n</file>\n<file path=\"b.py\">\n2\n</file>\n</files>\n<commands>\npython a.py\n</commands>\n<iteration_log>\nlog\n</iteration_log>"""
+        with TemporaryDirectory() as tmp:
+            tooling = LocalTooling(Path(tmp))
+            with self.assertRaises(ValueError):
+                OfflineCodingAgent._materialize(
+                    raw,
+                    tooling,
+                    approve_major_changes=False,
+                    major_change_threshold=1,
+                )
