@@ -11,6 +11,7 @@ A local-first autonomous coding assistant for Ollama that simulates a multi-agen
 
 - Structured generation contract with `<plan>`, `<reflection>`, `<codebase_analysis>`, `<files>`, `<commands>`, and `<iteration_log>` blocks
 - Safe local tools API (`read_file`, `write_file`, `list_files`, `run_command`, `install_package`)
+- Destructive command guardrails (blocks risky commands unless explicitly overridden)
 - Persistent memory (`conversation_history`, `project_files`, `previous_errors`)
 - Execution loop with automatic debugging up to 5 iterations and command timeout protection
 - Retrieval-aware file selection so prompts include only relevant codebase context
@@ -49,6 +50,10 @@ kautuk-agent "Improve existing project" --workspace ./output_project --memory-fi
 ## Model output format
 
 ```xml
+<spec>
+Requirements, constraints, and architecture summary.
+</spec>
+
 <plan>
 1. Analyze...
 2. Implement...

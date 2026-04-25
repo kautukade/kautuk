@@ -12,6 +12,9 @@ from .workspace import StructuredOutput, parse_structured_output
 
 PLANNER_SYSTEM = """You are Planner Agent (mistral/llama3 role). Build concise step-by-step plans."""
 CODER_SYSTEM = """You are Coder Agent (deepseek-coder role). Return exactly:
+<spec>
+...
+</spec>
 <plan>
 ...
 </plan>
@@ -72,11 +75,13 @@ class OfflineCodingAgent:
         relevant_files = self._select_relevant_files(task, all_files)
         codebase_snapshot = self._describe_codebase(relevant_files)
         self._emit_progress(progress_callback, "Analyzed codebase and selected relevant files.")
+        technical_spec = self._build_spec(task, models, codebase_snapshot)
+        self._emit_progress(progress_callback, "Built technical specification.")
         planner_output = self._plan(task, models, memory)
         self._emit_progress(progress_callback, "Generated plan.")
         plan_reflection = self._reflect(models, f"Reflect on this plan and improve it:\n\n{planner_output}")
         self._emit_progress(progress_callback, "Reflected on plan quality.")
-        coded = self._code(task, planner_output, models, memory, codebase_snapshot)
+        coded = self._code(task, technical_spec, planner_output, models, memory, codebase_snapshot)
         parsed = self._materialize(coded, tooling)
         self._emit_progress(progress_callback, "Materialized generated files.")
 
@@ -126,6 +131,8 @@ class OfflineCodingAgent:
         return {
             "models": models,
             "planner_output": planner_output,
+            "technical_spec": technical_spec,
+            "model_spec": parsed.spec,
             "plan_reflection": plan_reflection,
             "generation_reflection": parsed.reflection,
             "codebase_analysis": parsed.codebase_analysis,
@@ -145,9 +152,18 @@ class OfflineCodingAgent:
         )
         return self.client.generate(models.planner, prompt, system=PLANNER_SYSTEM)
 
+    def _build_spec(self, task: str, models: ModelSelection, codebase_snapshot: str) -> str:
+        prompt = (
+            "Create a concise technical specification with requirements, constraints, and architecture.\n\n"
+            f"Task:\n{task}\n\n"
+            f"Relevant codebase context:\n{codebase_snapshot}\n"
+        )
+        return self.client.generate(models.planner, prompt, system=PLANNER_SYSTEM)
+
     def _code(
         self,
         task: str,
+        technical_spec: str,
         plan: str,
         models: ModelSelection,
         memory: SessionMemory,
@@ -155,6 +171,7 @@ class OfflineCodingAgent:
     ) -> str:
         prompt = (
             f"Task:\n{task}\n\n"
+            f"Technical specification:\n{technical_spec}\n\n"
             f"Planner Notes:\n{plan}\n\n"
             f"Known project files:\n{memory.project_files}\n\n"
             f"Codebase snapshot:\n{codebase_snapshot}\n\n"

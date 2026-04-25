@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 
 
+SPEC_PATTERN = re.compile(r"<spec>\n(.*?)\n</spec>", re.DOTALL)
 PLAN_PATTERN = re.compile(r"<plan>\n(.*?)\n</plan>", re.DOTALL)
 REFLECTION_PATTERN = re.compile(r"<reflection>\n(.*?)\n</reflection>", re.DOTALL)
 CODEBASE_ANALYSIS_PATTERN = re.compile(r"<codebase_analysis>\n(.*?)\n</codebase_analysis>", re.DOTALL)
@@ -20,6 +21,7 @@ class GeneratedFile:
 
 @dataclass
 class StructuredOutput:
+    spec: str
     plan: str
     reflection: str
     codebase_analysis: str
@@ -29,6 +31,8 @@ class StructuredOutput:
 
 
 def parse_structured_output(raw: str) -> StructuredOutput:
+    spec_match = SPEC_PATTERN.search(raw)
+    spec = spec_match.group(1).strip() if spec_match else ""
     plan_match = PLAN_PATTERN.search(raw)
     plan = plan_match.group(1).strip() if plan_match else ""
     reflection_match = REFLECTION_PATTERN.search(raw)
@@ -47,6 +51,7 @@ def parse_structured_output(raw: str) -> StructuredOutput:
     iteration_log = iteration_log_match.group(1).strip() if iteration_log_match else ""
 
     return StructuredOutput(
+        spec=spec,
         plan=plan,
         reflection=reflection,
         codebase_analysis=codebase_analysis,

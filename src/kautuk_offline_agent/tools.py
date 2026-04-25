@@ -25,8 +25,9 @@ class CommandResult:
 class LocalTooling:
     """Local toolset used by the agent; mirrors the expected tool contract."""
 
-    def __init__(self, workspace: Path) -> None:
+    def __init__(self, workspace: Path, allow_destructive: bool = False) -> None:
         self.workspace = workspace.resolve()
+        self.allow_destructive = allow_destructive
 
     def _safe_path(self, path: str) -> Path:
         candidate = (self.workspace / path).resolve()
@@ -54,6 +55,13 @@ class LocalTooling:
         )
 
     def run_command(self, command: str, timeout_seconds: int = 120) -> CommandResult:
+        if not self.allow_destructive and self._looks_destructive(command):
+            return CommandResult(
+                command=command,
+                returncode=2,
+                stdout="",
+                stderr="Blocked potentially destructive command. Re-run with allow_destructive=True to override.",
+            )
         try:
             completed = subprocess.run(
                 command,
@@ -80,3 +88,9 @@ class LocalTooling:
 
     def install_package(self, package: str) -> CommandResult:
         return self.run_command(f"python -m pip install {package}")
+
+    @staticmethod
+    def _looks_destructive(command: str) -> bool:
+        risky_tokens = ("rm -rf", "mkfs", "dd if=", ":(){", "shutdown", "reboot")
+        lower_command = command.lower()
+        return any(token in lower_command for token in risky_tokens)

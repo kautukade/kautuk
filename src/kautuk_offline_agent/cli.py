@@ -36,6 +36,8 @@ def main() -> None:
 
     serializable = {
         "models": result["models"].__dict__,
+        "technical_spec": result["technical_spec"],
+        "model_spec": result["model_spec"],
         "planner_output": result["planner_output"],
         "plan_reflection": result["plan_reflection"],
         "generation_reflection": result["generation_reflection"],
