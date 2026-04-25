@@ -2,42 +2,35 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Iterable
 
 
+PLAN_PATTERN = re.compile(r"<plan>\n(.*?)\n</plan>", re.DOTALL)
 FILE_PATTERN = re.compile(r'<file\s+path="([^"]+)">\n(.*?)\n</file>', re.DOTALL)
-RUN_PATTERN = re.compile(r"<run>\n(.*?)\n</run>", re.DOTALL)
+COMMANDS_PATTERN = re.compile(r"<commands>\n(.*?)\n</commands>", re.DOTALL)
 
 
 @dataclass
-class GeneratedArtifact:
-    path: Path
+class GeneratedFile:
+    path: str
     content: str
 
 
 @dataclass
-class ModelOutput:
-    artifacts: list[GeneratedArtifact]
-    run_commands: list[str]
+class StructuredOutput:
+    plan: str
+    files: list[GeneratedFile]
+    commands: list[str]
 
 
-def parse_model_output(raw: str, root: Path) -> ModelOutput:
-    artifacts: list[GeneratedArtifact] = []
-    for relative_path, content in FILE_PATTERN.findall(raw):
-        safe_path = (root / relative_path).resolve()
-        if root.resolve() not in safe_path.parents and safe_path != root.resolve():
-            raise ValueError(f"Blocked path outside workspace: {relative_path}")
-        artifacts.append(GeneratedArtifact(path=safe_path, content=content.rstrip("\n") + "\n"))
+def parse_structured_output(raw: str) -> StructuredOutput:
+    plan_match = PLAN_PATTERN.search(raw)
+    plan = plan_match.group(1).strip() if plan_match else ""
 
-    run_commands = [command.strip() for command in RUN_PATTERN.findall(raw) if command.strip()]
-    return ModelOutput(artifacts=artifacts, run_commands=run_commands)
+    files = [GeneratedFile(path=path, content=content.rstrip("\n") + "\n") for path, content in FILE_PATTERN.findall(raw)]
 
+    commands_match = COMMANDS_PATTERN.search(raw)
+    commands: list[str] = []
+    if commands_match:
+        commands = [line.strip() for line in commands_match.group(1).splitlines() if line.strip()]
 
-def write_artifacts(artifacts: Iterable[GeneratedArtifact]) -> list[Path]:
-    written: list[Path] = []
-    for artifact in artifacts:
-        artifact.path.parent.mkdir(parents=True, exist_ok=True)
-        artifact.path.write_text(artifact.content, encoding="utf-8")
-        written.append(artifact.path)
-    return written
+    return StructuredOutput(plan=plan, files=files, commands=commands)

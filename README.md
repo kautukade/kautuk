@@ -1,18 +1,18 @@
 # kautuk offline coding agent
 
-A local-first autonomous coding assistant that uses Ollama models to:
+A local-first autonomous coding assistant for Ollama that simulates a multi-agent workflow:
 
-- analyze natural language requests,
-- create a step-by-step implementation plan,
-- generate full project files,
-- run commands,
-- and attempt automatic fixes on failure.
+- **Planner Agent** (`mistral` / `llama3`) for step planning
+- **Coder Agent** (`deepseek-coder`) for full file generation
+- **Debugger Agent** (`deepseek-coder`) for auto-fix loops
+- **Reviewer Agent** (`mistral` / `llama3`) for quality improvements
 
-## Model strategy
+## Features
 
-- `deepseek-coder` for code generation/fixing
-- `mistral` (or `llama3` for simple tasks) for planning
-- `gemma:2b` reserved for lightweight chat tasks
+- Structured generation contract with `<plan>`, `<files>`, and `<commands>` blocks
+- Safe local tools API (`read_file`, `write_file`, `list_files`, `run_command`, `install_package`)
+- Persistent memory (`conversation_history`, `project_files`, `previous_errors`)
+- Execution loop with automatic debugging up to 5 iterations
 
 ## Install
 
@@ -24,16 +24,8 @@ pip install -e .
 
 ## Prerequisites
 
-1. Install Ollama.
-2. Start Ollama server:
-
 ```bash
 ollama serve
-```
-
-3. Pull models:
-
-```bash
 ollama pull deepseek-coder
 ollama pull mistral
 ollama pull llama3
@@ -43,22 +35,32 @@ ollama pull gemma:2b
 ## Usage
 
 ```bash
-kautuk-agent "Build a Flask todo API with tests" --workspace ./output_project
+kautuk-agent "Build a FastAPI todo app with tests" --workspace ./output_project --max-iters 5
 ```
 
-The agent prints JSON summary including selected models, generated files, and command execution results.
+Optional memory file:
 
-## Output contract from code model
+```bash
+kautuk-agent "Improve existing project" --workspace ./output_project --memory-file ./agent-memory.json
+```
 
-The coder model is instructed to return blocks like:
+## Model output format
 
 ```xml
+<plan>
+1. Analyze...
+2. Implement...
+</plan>
+
+<files>
 <file path="app.py">
-# full file content
+# full code
 </file>
-<run>
+</files>
+
+<commands>
 python -m pytest -q
-</run>
+</commands>
 ```
 
-This keeps file writes deterministic and enables automated execution + repair loops.
+The CLI prints JSON with selected models, planner output, review notes, generated files, iteration logs, and memory path.
