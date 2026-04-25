@@ -35,9 +35,12 @@ def main() -> None:
     serializable = {
         "models": result["models"].__dict__,
         "planner_output": result["planner_output"],
+        "plan_reflection": result["plan_reflection"],
+        "generation_reflection": result["generation_reflection"],
         "review_notes": result["review_notes"],
         "written_files": result["written_files"],
         "iterations": [entry.__dict__ for entry in result["iterations"]],
+        "model_iteration_log": result["model_iteration_log"],
         "memory_file": result["memory_file"],
     }
     print(json.dumps(serializable, indent=2))

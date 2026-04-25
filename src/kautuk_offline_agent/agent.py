@@ -14,6 +14,9 @@ CODER_SYSTEM = """You are Coder Agent (deepseek-coder role). Return exactly:
 <plan>
 ...
 </plan>
+<reflection>
+...
+</reflection>
 <files>
 <file path=\"relative/path\">\nfull content\n</file>
 </files>
@@ -21,10 +24,14 @@ CODER_SYSTEM = """You are Coder Agent (deepseek-coder role). Return exactly:
 command one
 command two
 </commands>
+<iteration_log>
+short generation summary
+</iteration_log>
 Rules: produce full files, include comments, error handling, and modular architecture.
 """
 DEBUGGER_SYSTEM = """You are Debugger Agent (deepseek-coder role). Fix failing code using error logs. Return same structured format."""
 REVIEWER_SYSTEM = """You are Reviewer Agent (mistral/llama3 role). Suggest quality/scalability improvements in short bullets."""
+REFLECTION_SYSTEM = """You are Reflection Agent. Evaluate output quality, identify weaknesses, and suggest immediate improvements."""
 
 
 @dataclass
@@ -56,6 +63,7 @@ class OfflineCodingAgent:
 
         models = select_models(task)
         planner_output = self._plan(task, models, memory)
+        plan_reflection = self._reflect(models, f"Reflect on this plan and improve it:\n\n{planner_output}")
         coded = self._code(task, planner_output, models, memory)
         parsed = self._materialize(coded, tooling)
 
@@ -86,6 +94,12 @@ class OfflineCodingAgent:
                 break
 
             debug_response = self._debug(task, planner_output, models, memory, failed)
+            fix_reflection = self._reflect(
+                models,
+                "Classify the error type (syntax/runtime/dependency/logic) and evaluate the fix quality.\n\n"
+                f"Command: {failed.command}\nOutput:\n{failed.merged_output}",
+            )
+            memory.conversation_history.append(fix_reflection)
             current_output = self._materialize(debug_response, tooling)
 
         review_notes = self._review(task, planner_output, models, memory, tooling.list_files("."))
@@ -96,9 +110,12 @@ class OfflineCodingAgent:
         return {
             "models": models,
             "planner_output": planner_output,
+            "plan_reflection": plan_reflection,
+            "generation_reflection": parsed.reflection,
             "review_notes": review_notes,
             "written_files": [generated.path for generated in parsed.files],
             "iterations": iteration_logs,
+            "model_iteration_log": parsed.iteration_log,
             "memory_file": str(memory_path),
         }
 
@@ -115,7 +132,8 @@ class OfflineCodingAgent:
             f"Task:\n{task}\n\n"
             f"Planner Notes:\n{plan}\n\n"
             f"Known project files:\n{memory.project_files}\n\n"
-            "Generate implementation with required structured format."
+            "Generate exactly two implementation approaches, compare them briefly, then choose one and implement it.\n"
+            "Use required structured format."
         )
         return self.client.generate(models.coder, prompt, system=CODER_SYSTEM)
 
@@ -132,6 +150,7 @@ class OfflineCodingAgent:
             f"Plan:\n{plan}\n\n"
             f"Failed command:\n{failed.command}\n\n"
             f"Error:\n{failed.merged_output}\n\n"
+            f"Error type guess:\n{self._classify_error(failed.merged_output)}\n\n"
             f"Recent errors:\n{memory.previous_errors[-5:]}\n\n"
             "Fix all root causes and return full files + commands."
         )
@@ -162,3 +181,17 @@ class OfflineCodingAgent:
         for generated in parsed.files:
             tooling.write_file(generated.path, generated.content)
         return parsed
+
+    def _reflect(self, models: ModelSelection, content: str) -> str:
+        return self.client.generate(models.planner, content, system=REFLECTION_SYSTEM)
+
+    @staticmethod
+    def _classify_error(error_output: str) -> str:
+        lowered = error_output.lower()
+        if "syntaxerror" in lowered or "invalid syntax" in lowered:
+            return "syntax"
+        if "no module named" in lowered or "not found" in lowered:
+            return "dependency"
+        if "traceback (most recent call last)" in lowered or "exception" in lowered:
+            return "runtime"
+        return "logic"

@@ -9,7 +9,7 @@ A local-first autonomous coding assistant for Ollama that simulates a multi-agen
 
 ## Features
 
-- Structured generation contract with `<plan>`, `<files>`, and `<commands>` blocks
+- Structured generation contract with `<plan>`, `<reflection>`, `<files>`, `<commands>`, and `<iteration_log>` blocks
 - Safe local tools API (`read_file`, `write_file`, `list_files`, `run_command`, `install_package`)
 - Persistent memory (`conversation_history`, `project_files`, `previous_errors`)
 - Execution loop with automatic debugging up to 5 iterations
@@ -52,6 +52,10 @@ kautuk-agent "Improve existing project" --workspace ./output_project --memory-fi
 2. Implement...
 </plan>
 
+<reflection>
+Plan quality is acceptable; improve test coverage.
+</reflection>
+
 <files>
 <file path="app.py">
 # full code
@@ -61,6 +65,10 @@ kautuk-agent "Improve existing project" --workspace ./output_project --memory-fi
 <commands>
 python -m pytest -q
 </commands>
+
+<iteration_log>
+Generated initial project scaffold and tests.
+</iteration_log>
 ```
 
 The CLI prints JSON with selected models, planner output, review notes, generated files, iteration logs, and memory path.
