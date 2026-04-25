@@ -52,3 +52,14 @@ class AgentUtilityTests(unittest.TestCase):
                     approve_major_changes=False,
                     major_change_threshold=1,
                 )
+
+    def test_materialize_honors_apply_callback_decline(self) -> None:
+        raw = """<spec>\ns\n</spec>\n<plan>\np\n</plan>\n<reflection>\nr\n</reflection>\n<codebase_analysis>\nc\n</codebase_analysis>\n<files>\n<file path=\"a.py\">\n1\n</file>\n</files>\n<commands>\npython a.py\n</commands>\n<iteration_log>\nlog\n</iteration_log>"""
+        with TemporaryDirectory() as tmp:
+            tooling = LocalTooling(Path(tmp))
+            with self.assertRaises(ValueError):
+                OfflineCodingAgent._materialize(
+                    raw,
+                    tooling,
+                    apply_changes_callback=lambda _changes: False,
+                )

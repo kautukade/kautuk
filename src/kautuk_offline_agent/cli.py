@@ -41,6 +41,7 @@ def main() -> None:
         progress_callback=(lambda msg: print(f"[progress] {msg}")) if args.stream else None,
         approve_major_changes=(not args.interactive) or _confirm_major_changes(),
         major_change_threshold=max(1, args.major_change_threshold),
+        apply_changes_callback=_interactive_change_review if args.interactive else None,
     )
 
     serializable = {
@@ -64,6 +65,16 @@ def main() -> None:
 
 def _confirm_major_changes() -> bool:
     answer = input("Major changes may be required. Continue? [y/N]: ").strip().lower()
+    return answer in {"y", "yes"}
+
+
+def _interactive_change_review(changes: list[dict]) -> bool:
+    print("\n[diff preview]")
+    for change in changes:
+        print(f"- {change['status']}: {change['path']}")
+        if change["diff_preview"]:
+            print(change["diff_preview"])
+    answer = input("Apply these changes? [y/N]: ").strip().lower()
     return answer in {"y", "yes"}
 
 

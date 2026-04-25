@@ -18,6 +18,7 @@ A local-first autonomous coding assistant for Ollama that simulates a multi-agen
 - Optional streaming progress updates (`--stream`) for incremental visibility
 - Interactive safety prompt for major file batches (`--interactive`)
 - Per-file change previews in CLI JSON (`file_changes`) to improve edit visibility
+- In interactive mode, CLI shows diff previews and requests approval before writing files
 
 ## Install
 

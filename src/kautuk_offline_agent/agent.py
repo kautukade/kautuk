@@ -70,6 +70,7 @@ class OfflineCodingAgent:
         progress_callback: Callable[[str], None] | None = None,
         approve_major_changes: bool = False,
         major_change_threshold: int = 10,
+        apply_changes_callback: Callable[[list[dict]], bool] | None = None,
     ) -> dict:
         workspace = workspace.resolve()
         workspace.mkdir(parents=True, exist_ok=True)
@@ -97,6 +98,7 @@ class OfflineCodingAgent:
             tooling,
             approve_major_changes=approve_major_changes,
             major_change_threshold=major_change_threshold,
+            apply_changes_callback=apply_changes_callback,
         )
         self._emit_progress(progress_callback, "Materialized generated files.")
 
@@ -134,7 +136,11 @@ class OfflineCodingAgent:
                 f"Command: {failed.command}\nOutput:\n{failed.merged_output}",
             )
             memory.conversation_history.append(fix_reflection)
-            current_output, debug_changes = self._materialize(debug_response, tooling)
+            current_output, debug_changes = self._materialize(
+                debug_response,
+                tooling,
+                apply_changes_callback=apply_changes_callback,
+            )
             file_changes.extend(debug_changes)
             self._emit_progress(progress_callback, f"Iteration {idx} failed; applied automated debug fix.")
 
@@ -240,6 +246,7 @@ class OfflineCodingAgent:
         tooling: LocalTooling,
         approve_major_changes: bool = True,
         major_change_threshold: int = 10,
+        apply_changes_callback: Callable[[list[dict]], bool] | None = None,
     ) -> tuple[StructuredOutput, list[FileChange]]:
         parsed = parse_structured_output(raw)
         if not parsed.files:
@@ -249,6 +256,7 @@ class OfflineCodingAgent:
                 f"Major change detected ({len(parsed.files)} files). "
                 "Set approve_major_changes=True to continue."
             )
+        pending_changes: list[tuple[str, str, str]] = []
         changes: list[FileChange] = []
         for generated in parsed.files:
             try:
@@ -257,7 +265,6 @@ class OfflineCodingAgent:
             except FileNotFoundError:
                 existing = ""
                 status = "created"
-            tooling.write_file(generated.path, generated.content)
             diff_lines = list(
                 unified_diff(
                     existing.splitlines(),
@@ -270,6 +277,15 @@ class OfflineCodingAgent:
             )
             preview = "\n".join(diff_lines[:40])
             changes.append(FileChange(path=generated.path, status=status, diff_preview=preview))
+            pending_changes.append((generated.path, generated.content, status))
+
+        if apply_changes_callback is not None:
+            approved = apply_changes_callback([change.__dict__ for change in changes])
+            if not approved:
+                raise ValueError("User declined applying proposed file changes.")
+
+        for path, content, _status in pending_changes:
+            tooling.write_file(path, content)
         return parsed, changes
 
     def _reflect(self, models: ModelSelection, content: str) -> str:
