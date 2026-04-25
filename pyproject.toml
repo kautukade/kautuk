@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kautuk-offline-agent"
+version = "0.1.0"
+description = "Autonomous offline coding assistant powered by local Ollama models"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "kautuk" }]
+
+[project.scripts]
+kautuk-agent = "kautuk_offline_agent.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
