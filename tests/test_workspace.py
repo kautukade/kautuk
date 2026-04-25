@@ -11,6 +11,9 @@ step 1
 <reflection>
 looks good
 </reflection>
+<codebase_analysis>
+has app.py
+</codebase_analysis>
 <files>
 <file path=\"app.py\">
 print('hi')
@@ -26,6 +29,7 @@ first pass
         parsed = parse_structured_output(raw)
         self.assertEqual(parsed.plan, "step 1")
         self.assertEqual(parsed.reflection, "looks good")
+        self.assertEqual(parsed.codebase_analysis, "has app.py")
         self.assertEqual(parsed.files[0].path, "app.py")
         self.assertEqual(parsed.commands, ["python app.py"])
         self.assertEqual(parsed.iteration_log, "first pass")

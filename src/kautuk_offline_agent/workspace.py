@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 PLAN_PATTERN = re.compile(r"<plan>\n(.*?)\n</plan>", re.DOTALL)
 REFLECTION_PATTERN = re.compile(r"<reflection>\n(.*?)\n</reflection>", re.DOTALL)
+CODEBASE_ANALYSIS_PATTERN = re.compile(r"<codebase_analysis>\n(.*?)\n</codebase_analysis>", re.DOTALL)
 FILE_PATTERN = re.compile(r'<file\s+path="([^"]+)">\n(.*?)\n</file>', re.DOTALL)
 COMMANDS_PATTERN = re.compile(r"<commands>\n(.*?)\n</commands>", re.DOTALL)
 ITERATION_LOG_PATTERN = re.compile(r"<iteration_log>\n(.*?)\n</iteration_log>", re.DOTALL)
@@ -21,6 +22,7 @@ class GeneratedFile:
 class StructuredOutput:
     plan: str
     reflection: str
+    codebase_analysis: str
     files: list[GeneratedFile]
     commands: list[str]
     iteration_log: str
@@ -31,6 +33,8 @@ def parse_structured_output(raw: str) -> StructuredOutput:
     plan = plan_match.group(1).strip() if plan_match else ""
     reflection_match = REFLECTION_PATTERN.search(raw)
     reflection = reflection_match.group(1).strip() if reflection_match else ""
+    codebase_analysis_match = CODEBASE_ANALYSIS_PATTERN.search(raw)
+    codebase_analysis = codebase_analysis_match.group(1).strip() if codebase_analysis_match else ""
 
     files = [GeneratedFile(path=path, content=content.rstrip("\n") + "\n") for path, content in FILE_PATTERN.findall(raw)]
 
@@ -45,6 +49,7 @@ def parse_structured_output(raw: str) -> StructuredOutput:
     return StructuredOutput(
         plan=plan,
         reflection=reflection,
+        codebase_analysis=codebase_analysis,
         files=files,
         commands=commands,
         iteration_log=iteration_log,

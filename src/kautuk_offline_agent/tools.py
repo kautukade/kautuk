@@ -11,6 +11,7 @@ class CommandResult:
     returncode: int
     stdout: str
     stderr: str
+    timed_out: bool = False
 
     @property
     def ok(self) -> bool:
@@ -52,20 +53,30 @@ class LocalTooling:
             if path.is_file()
         )
 
-    def run_command(self, command: str) -> CommandResult:
-        completed = subprocess.run(
-            command,
-            cwd=self.workspace,
-            shell=True,
-            capture_output=True,
-            text=True,
-        )
-        return CommandResult(
-            command=command,
-            returncode=completed.returncode,
-            stdout=completed.stdout,
-            stderr=completed.stderr,
-        )
+    def run_command(self, command: str, timeout_seconds: int = 120) -> CommandResult:
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=self.workspace,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+            )
+            return CommandResult(
+                command=command,
+                returncode=completed.returncode,
+                stdout=completed.stdout,
+                stderr=completed.stderr,
+            )
+        except subprocess.TimeoutExpired as exc:
+            return CommandResult(
+                command=command,
+                returncode=124,
+                stdout=exc.stdout or "",
+                stderr=(exc.stderr or "") + f"\nCommand timed out after {timeout_seconds}s.",
+                timed_out=True,
+            )
 
     def install_package(self, package: str) -> CommandResult:
         return self.run_command(f"python -m pip install {package}")

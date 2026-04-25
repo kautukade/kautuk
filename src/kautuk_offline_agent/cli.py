@@ -37,6 +37,7 @@ def main() -> None:
         "planner_output": result["planner_output"],
         "plan_reflection": result["plan_reflection"],
         "generation_reflection": result["generation_reflection"],
+        "codebase_analysis": result["codebase_analysis"],
         "review_notes": result["review_notes"],
         "written_files": result["written_files"],
         "iterations": [entry.__dict__ for entry in result["iterations"]],

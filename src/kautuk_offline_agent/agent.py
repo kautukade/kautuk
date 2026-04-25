@@ -17,6 +17,9 @@ CODER_SYSTEM = """You are Coder Agent (deepseek-coder role). Return exactly:
 <reflection>
 ...
 </reflection>
+<codebase_analysis>
+...
+</codebase_analysis>
 <files>
 <file path=\"relative/path\">\nfull content\n</file>
 </files>
@@ -60,11 +63,13 @@ class OfflineCodingAgent:
         memory_path = memory_file or workspace / ".agent_memory.json"
         memory = SessionMemory.load(memory_path)
         memory.conversation_history.append(task)
+        memory.compact()
 
         models = select_models(task)
+        codebase_snapshot = self._describe_codebase(tooling.list_files("."))
         planner_output = self._plan(task, models, memory)
         plan_reflection = self._reflect(models, f"Reflect on this plan and improve it:\n\n{planner_output}")
-        coded = self._code(task, planner_output, models, memory)
+        coded = self._code(task, planner_output, models, memory, codebase_snapshot)
         parsed = self._materialize(coded, tooling)
 
         iteration_logs: list[IterationLog] = []
@@ -112,6 +117,7 @@ class OfflineCodingAgent:
             "planner_output": planner_output,
             "plan_reflection": plan_reflection,
             "generation_reflection": parsed.reflection,
+            "codebase_analysis": parsed.codebase_analysis,
             "review_notes": review_notes,
             "written_files": [generated.path for generated in parsed.files],
             "iterations": iteration_logs,
@@ -127,11 +133,20 @@ class OfflineCodingAgent:
         )
         return self.client.generate(models.planner, prompt, system=PLANNER_SYSTEM)
 
-    def _code(self, task: str, plan: str, models: ModelSelection, memory: SessionMemory) -> str:
+    def _code(
+        self,
+        task: str,
+        plan: str,
+        models: ModelSelection,
+        memory: SessionMemory,
+        codebase_snapshot: str,
+    ) -> str:
         prompt = (
             f"Task:\n{task}\n\n"
             f"Planner Notes:\n{plan}\n\n"
             f"Known project files:\n{memory.project_files}\n\n"
+            f"Codebase snapshot:\n{codebase_snapshot}\n\n"
+            f"Conversation summary:\n{memory.conversation_summary}\n\n"
             "Generate exactly two implementation approaches, compare them briefly, then choose one and implement it.\n"
             "Use required structured format."
         )
@@ -195,3 +210,11 @@ class OfflineCodingAgent:
         if "traceback (most recent call last)" in lowered or "exception" in lowered:
             return "runtime"
         return "logic"
+
+    @staticmethod
+    def _describe_codebase(files: list[str], max_files: int = 40) -> str:
+        if not files:
+            return "No files detected."
+        sample = files[:max_files]
+        suffix = "" if len(files) <= max_files else f"\n...and {len(files) - max_files} more files."
+        return "\n".join(sample) + suffix
